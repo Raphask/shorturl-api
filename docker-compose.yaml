@@ -1,0 +1,54 @@
+services:
+  app:
+    build: .  # <--- FALTAVA ISSO: Diz para o Docker compilar o seu código atual!
+    image: url-shorter:latest
+    ports:
+      - "8081:8081"
+    environment:
+      - DATABASE_URL=postgres://postgres@db:5432/shorturldb
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks: # <--- FALTAVA ISSO: Conecta o app na rede do banco e do redis
+      - url_network
+
+  db:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
+      POSTGRES_DB: shorturldb
+    ports:
+      - "5432:5432"
+    volumes:
+      - data_sql:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks: 
+      - url_network
+
+  redis:
+    image: redis:7-alpine
+    restart: always
+    ports:
+      - "6379:6379"
+    command: redis-server --save 20 1 --loglevel warning
+    volumes:
+      - redis-data:/data
+    networks: 
+      - url_network
+
+# Cria a rede privada isolada para eles se conversarem usando os nomes "db" e "redis"
+networks:
+  url_network:
+    driver: bridge
+
+volumes:
+  data_sql:
+  redis-data:
